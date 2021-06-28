@@ -653,6 +653,7 @@ For nRec := 1 to Len(aRecnos)
 		RestArea(aArea)
 		aRotAut:= {}
 	EndIf
+	IncProc()
 Next nRec
 
 RestArea(aAreaSX3)
