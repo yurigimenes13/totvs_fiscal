@@ -605,54 +605,54 @@ For nRec := 1 to Len(aRecnos)
 		EndiF	
 		RestArea(aArea)
 	Next nX	
+	If Len(aColsWiz)<>0 .and. nPos <> 0 .AND. aColsWiz[nPos,nHead]<>aColsWiz[nPos,nHead-1]
+		dbSelectArea(cAlias)
+		aArea := GetArea()
+		If "SB1"==cAliasAnt
+			MATA010(aRotAut,4)
+		ElseIf "SA2"==cAliasAnt
+			MATA020(aRotAut,4)
+		ElseIf "SA1"==cAliasAnt
+			MATA030(aRotAut,4)
+		ElseIf "SF4"==cAliasAnt
+			MATA080(aRotAut,4)
+		ElseIf "SFM"==cAliasAnt
+			MATA089(aRotAut,4)
+		ElseIf "SE2"==cAliasAnt
+			FINA050(aRotAut,,4)
+		ElseIf "SE1"==cAliasAnt
+			FINA040(aRotAut,4)	
+		EndIf
 
-	dbSelectArea(cAlias)
-	aArea := GetArea()
-	If "SB1"==cAliasAnt
-		MATA010(aRotAut,4)
-	ElseIf "SA2"==cAliasAnt
-		MATA020(aRotAut,4)
-	ElseIf "SA1"==cAliasAnt
-		MATA030(aRotAut,4)
-	ElseIf "SF4"==cAliasAnt
-		MATA080(aRotAut,4)
-	ElseIf "SFM"==cAliasAnt
-		MATA089(aRotAut,4)
-	ElseIf "SE2"==cAliasAnt
-		FINA050(aRotAut,,4)
-	ElseIf "SE1"==cAliasAnt
-		FINA040(aRotAut,4)	
+		cLinha := ""
+
+		dbSelectArea(cAlias)
+		If !Empty(cExpApFim) .AND. nX==1
+			cLinha += &(cExpApFim)
+		EndIf
+
+		If !Empty(cPosiciona)
+			cLinha += " - "+&cPosiciona
+		EndIf
+
+		If lMsErroAuto
+			cLinha += STR0060+NomeAutoLog()+STR0043 //" --> Não atualizado, verificar observação deste registro no arquivo "###" criado no diretório STARTPATH do sistema, geralmente SYSTEM ou SIGAADV."
+			cLinha += CRLF
+		ElseIf nX==1 .OR. cAliasAnt $ "SE2|SE1" 
+			cLinha += STR0044 //" --> Atualização efetuada com sucesso."
+			cLinha += CRLF
+		EndIf
+
+		//-- Tamanho limite da string = 1GB
+		If Len(cTexto) + Len(cLinha) > 1000000
+			SaveLog(cFileLog,cTexto)
+			cTexto := ''
+		EndIf
+		cTexto += cLinha
+
+		RestArea(aArea)
+		aRotAut:= {}
 	EndIf
-
-	cLinha := ""
-
-	dbSelectArea(cAlias)
-	If !Empty(cExpApFim) .AND. nX==1
-		cLinha += &(cExpApFim)
-	EndIf
-
-	If !Empty(cPosiciona)
-		cLinha += " - "+&cPosiciona
-	EndIf
-
-	If lMsErroAuto
-		cLinha += STR0060+NomeAutoLog()+STR0043 //" --> Não atualizado, verificar observação deste registro no arquivo "###" criado no diretório STARTPATH do sistema, geralmente SYSTEM ou SIGAADV."
-		cLinha += CRLF
-	ElseIf nX==1 .OR. cAliasAnt $ "SE2|SE1" 
-		cLinha += STR0044 //" --> Atualização efetuada com sucesso."
-		cLinha += CRLF
-	EndIf
-
-	//-- Tamanho limite da string = 1GB
-	If Len(cTexto) + Len(cLinha) > 1000000
-		SaveLog(cFileLog,cTexto)
-		cTexto := ''
-	EndIf
-	cTexto += cLinha
-
-	RestArea(aArea)
-	aRotAut:= {}
-
 Next nRec
 
 RestArea(aAreaSX3)
