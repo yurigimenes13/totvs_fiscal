@@ -785,8 +785,8 @@ DbSelectArea(cAlias)
 cFil := StrTran(UPPER(cFil),"DTOS")
 
 //Executa o filtro na tabela
-(cAlias)->(DbSetFilter( {||&cFil}, cFil  ) )
-(cAlias)->(DBGoTop())
+(cAlias)->(QryFil( cAlias, cFil  ) )
+
 
 While !Eof() .And. xFilial(cAliasAnt)==&(SubStr(cAliasAnt,2,2)+"_FILIAL") .And. !Empty(aCampos)
 	If !Empty(cFil) .And. (cAlias)->(&(cFil))
@@ -816,9 +816,9 @@ EndIf
 
 RestArea(aAreaAnt)
 
-If !Empty(cFil)
-	(cAlias)->(dbClearFilter())
-EndIf
+//If !Empty(cFil)
+//	(cAlias)->(dbClearFilter())
+//EndIf
 
 If lRet
 	aSort(aColsWiz,,,{|x,y|x[1]<y[1]})
@@ -1068,3 +1068,93 @@ Static Function GetQryFrom (cGetDB, aAliasFlds )
 		cFromQuery := "%" + cFromQuery + "%"
 	EndIf
 Return cFromQuery
+
+
+//------------------------------------------------------------------------------
+/*/	{Protheus.doc} QryFil
+
+Executa o Filtro da rotina
+
+@sample	GetQryFrom('Oracle', {B1_FILIAL, B1_COD}) 
+
+@param	cGetDB, Character, Nome do banco de dados
+		aAliasFlds, Array, Campos da estrutura de dados do Alias em uso (DbStruct)
+@return	cFromQuery, caracter, Expressão já tratada com '%' para ser usada no BeginSQL
+
+@author	Yuri Gimenes/ Squad Fiscal
+@since	28/11/2017
+@version 12.1.17
+/*/ 
+//------------------------------------------------------------------------------
+
+Static Function QryFil(cAlias,cFil)
+
+Local 	aAliasFlds	:=  {}
+Local	cFrom 		:=	""
+Local	cWhere		:=	""
+Local	cOrder		:=	""
+Local	cFilQry		:=	""
+
+cFil := StrTira(cFil)
+
+#IFDEF TOP
+
+	If (TcSrvType ()<>"AS/400")
+		aAliasFlds := (cAlias)->( DbStruct() )
+		cFrom	:=	"%"+RetSqlName(cAlias)+" "+cAlias+"%"
+		cFilQry	:=	SubStr(cAlias,2,2)+"_FILIAL"
+		If Empty(cFil)
+			cWhere	:= "%"+cAlias+".D_E_L_E_T_=' ' AND "+cAlias+"."+cFilQry+"='"+xFilial(cAlias)+"'%"
+		Else
+			cWhere	:= "%"+cAlias+".D_E_L_E_T_=' ' AND "+cAlias+"."+cFilQry+"='"+xFilial(cAlias)+"' AND "
+			cWhere  += "(" + AllTrim(Lower(cFil)) + " OR " + AllTrim(cFil) + ")%"
+		EndIf
+		cOrder	:=	"%"+SqlOrder(IndexKey())+"%"
+		cAlias	:=	GetNextAlias()
+		
+		cSelect := GetQryFrom (cGetDB, aAliasFlds )
+
+		BeginSql Alias cAlias
+		SELECT %Exp:cSelect%
+		FROM 
+			%Exp:cFrom%
+		WHERE 
+			%Exp:cWhere%
+		ORDER BY 
+			%Exp:cOrder%
+		EndSql
+		dbSelectArea(cAlias)
+	Else
+#ENDIF
+
+	dbSelectArea(cAlias)
+	dbSeek(xFilial())
+
+#IFDEF TOP
+	EndIf
+#ENDIF	
+
+Return
+
+//------------------------------------------------------------------------------
+/*/	{Protheus.doc} QryAtua
+
+Usada para limpar os caracteres vindos no cFil para ser utilizado na Query
+
+@author	Yuri Gimenes / SQUAD FISCAL
+@since	22/06/2021
+@version 12.1.27
+/*/ 
+//------------------------------------------------------------------------------
+
+Static Function StrTira(cFil)
+
+Local cFiltro := cFil
+
+cFiltro := STRTRAN(cFiltro,'"',"'")
+cFiltro := STRTRAN(cFiltro,"==","=")
+cFiltro := STRTRAN(cFiltro,".AND.","AND")
+cFiltro := STRTRAN(cFiltro,".OR.","OR")
+cFiltro := STRTRAN(cFiltro,"$","LIKE")
+
+Return cFiltro
