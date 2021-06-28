@@ -6,6 +6,8 @@
 #DEFINE INCLUIR 1
 #DEFINE ALTERAR 2
 
+Static aRecnos := {} //Ira armazenar os RECNOS dos registros que serão alterados
+
 /*
 ÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜ
 ±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±
@@ -541,181 +543,124 @@ Local lRet			:= .F.
 Local aRotAut		:= {}
 Local aArea			:= {}
 Local aAreaAnt		:= {}
-Local aAliasFlds	:= {}
-Local cFrom			:= ""
-Local cWhere		:= ""
-Local cOrder		:= ""
-Local cFilQry		:= ""
 Local cAliasAnt		:= cAlias
 Local nI			:= 0
-Local aErro			:= {}
 Local cValor		:= ""
 Local cValSeek		:= ""
 Local cLinha		:= ""
-Local cSelect		:= ''
 Local nX			:= 0
 Local nHead			:= 0
 Local nAux			:= 0
 Local aRotAut	    := {}
-
-cFil := StrTira(cFil)
+Local nRec			:= 0
 
 aColsWiz	:=	oGetDad:aCols
 
-DbSelectArea (cAlias)
-(cAlias)->(DbSetOrder (1))
+DbSelectArea(cAlias)
+(cAlias)->(DbSetOrder(1))
 aAreaAnt	:= (cAliasAnt)->(GetArea())
-#IFDEF TOP
-	If (TcSrvType ()<>"AS/400")
-		aAliasFlds := (cAlias)->( DbStruct() )
-		cFrom	:= "%"+RetSqlName(cAlias)+" "+cAlias+"%"
-		cFilQry	:= SubStr(cAlias,2,2)+"_FILIAL"
-		cWhere	:= "%"+cAlias+".D_E_L_E_T_=' ' AND "+cAlias+"."+cFilQry+"='"+xFilial(cAlias)+"' AND "
-		cWhere  += "(" + AllTrim(Lower(cFil)) + " OR " + AllTrim(cFil) + ")%"
- 		cOrder	:= "%"+SqlOrder(IndexKey())+"%"
-		cAlias	:= GetNextAlias()
 
-		BeginSql Alias cAlias
-		SELECT
-			COUNT(R_E_C_N_O_) CTD
-		FROM
-			%Exp:cFrom%
-		WHERE
-			%Exp:cWhere%
-		EndSql
-		ProcRegua(CTD)
-		dbSelectArea(cAlias)
-		(cAlias)->( DbCloseArea() )
-				
-		cSelect := GetQryFrom (cGetDB, aAliasFlds )
-		
-		BeginSql Alias cAlias
-		SELECT
-		 	%Exp:cSelect%
-		FROM
-			%Exp:cFrom%
-		WHERE
-			%Exp:cWhere%
-		ORDER BY
-			%Exp:cOrder%
-		EndSql
-	Else
-#ENDIF
-
-	dbSelectArea(cAlias)
-	ProcRegua(LastRec())
-	dbSeek(xFilial())
-
-#IFDEF TOP
-	EndIf
-#ENDIF
-
-cFil := StrTran(UPPER(cFil),"DTOS")
-While !Eof() .And. xFilial(cAliasAnt)==&(SubStr(cAliasAnt,2,2)+"_FILIAL")
+For nRec := 1 to Len(aRecnos)
+	(cAlias)->(DbGoto(aRecnos[nRec]))
 	
-	(cAliasAnt)->(DbGoto((cAlias)->RECNO) )
+	lMSErroAuto := .F.
+	
+	aArea := (GetArea())
+	For nX:= 1 To Len(aCampos)
 
- 	If !Empty(cFil)
-	 	aArea := GetArea()
-		For nX:= 1 To Len(aCampos)
+		nHead:= aScan(aheadwiz,{|aX| aX[2]==aAlterRot[nX]})
 
-			nHead:= aScan(aheadwiz,{|aX| aX[2]==aAlterRot[nX]})
+		If Len(aColsWiz)<>0 .And. (nPos := &(cCdBlock))<>0 .And.;
+			aColsWiz[nPos,nHead]<>aColsWiz[nPos,nHead-1]
 
-			nPos := &(cCdBlock)
+			lRet	:= .T.
 
-			If Len(aColsWiz)<>0 .And. nPos<>0 .And.;
-				aColsWiz[nPos,nHead]<>aColsWiz[nPos,nHead-1]
-
-				lRet	:= .T.
-
-				For nI := 1 To Len(aIndKey)
-					If "SFM" == cAliasAnt
-						SFM->(DbGoto((cAlias)->RECNO))
-						aAdd(aRotAut,{aIndKey[nI], &('SFM->'+aIndKey[nI]), Nil})
-					Else
-						aAdd(aRotAut,{aIndKey[nI], &(aIndKey[nI]), Nil})
-					EndIF
-				Next nI
-
-				DbSelectArea("SX3")
-				DbSetOrder(2)
-
-				If dbSeek(aCampos[nX]) .And. SX3->X3_TIPO == "D"
-					cValor   := StoD(aColsWiz[nPos,nHead])
-					cValSeek := (aColsWiz[nPos,nHead-1])
+			For nI := 1 To Len(aIndKey)
+				If "SFM" == cAliasAnt
+					SFM->(DbGoto((cAlias)->RECNO))
+					aAdd(aRotAut,{aIndKey[nI], &('SFM->'+aIndKey[nI]), Nil})
 				Else
-					cValor   := (aColsWiz[nPos,nHead])
-					cValSeek := (aColsWiz[nPos,nHead-1])
-				Endif
+					aAdd(aRotAut,{aIndKey[nI], &(aIndKey[nI]), Nil})
+				EndIF
+			Next nI
 
-				nAux := aScan(aRotAut,{|z| z[1] == aCampos[nX]})
-				If nAux > 0
-					aRotAut[nAux][2] := cValor
-					AADD(aRotAut[nAux],cValSeek)
-				Else
-					aAdd(aRotAut,{aCampos[nX], cValor, Nil})
-				EndIf
-			EndiF	
-			RestArea(aArea)
-		Next nX	
-			If Len(aColsWiz)<>0 .and. nPos <> 0 .AND. aColsWiz[nPos,nHead]<>aColsWiz[nPos,nHead-1]
-				dbSelectArea(cAlias)
-				aArea := GetArea()
-				If "SB1"==cAliasAnt
-					MATA010(aRotAut,4)
-				ElseIf "SA2"==cAliasAnt
-					MATA020(aRotAut,4)
-				ElseIf "SA1"==cAliasAnt
-					MATA030(aRotAut,4)
-				ElseIf "SF4"==cAliasAnt
-					MATA080(aRotAut,4)
-				ElseIf "SFM"==cAliasAnt
-					MATA089(aRotAut,4)
-				EndIf
+			DbSelectArea("SX3")
+			DbSetOrder(2)
 
-				cLinha := ""
+			If dbSeek(aCampos[nX]) .And. SX3->X3_TIPO == "D" .and. VALTYPE(aColsWiz[nPos,nHead]) <> "D"
+				cValor   := StoD(aColsWiz[nPos,nHead])
+				cValSeek := (aColsWiz[nPos,nHead-1])
+			Else
+				cValor   := (aColsWiz[nPos,nHead])
+				cValSeek := (aColsWiz[nPos,nHead-1])
+			Endif
 
-				dbSelectArea(cAlias)
-				If !Empty(cExpApFim) .AND. nX==1
-					cLinha += &(cExpApFim)
-				EndIf
-
-				If !Empty(cPosiciona)
-					cLinha += " - "+&cPosiciona
-				EndIf
-
-				If lMsErroAuto
-					cLinha += STR0060+NomeAutoLog()+STR0043 //" --> Não atualizado, verificar observação deste registro no arquivo "###" criado no diretório STARTPATH do sistema, geralmente SYSTEM ou SIGAADV."
-					cLinha += CRLF
-				ElseIf nX==1
-					cLinha += STR0044 //" --> Atualização efetuada com sucesso."
-					cLinha += CRLF
-				EndIf
-
-				//-- Tamanho limite da string = 1GB
-				If Len(cTexto) + Len(cLinha) > 1000000
-					SaveLog(cFileLog,cTexto)
-					cTexto := ''
-				EndIf
-				cTexto += cLinha
-
-				RestArea(aArea)
-				aRotAut:= {}
+			nAux := aScan(aRotAut,{|z| z[1] == aCampos[nX]})
+			If nAux > 0
+				aRotAut[nAux][2] := cValor
+				AADD(aRotAut[nAux],cValSeek)
+			Else
+				aAdd(aRotAut,{aCampos[nX], cValor, Nil})
 			EndIf
-	EndIf
-	IncProc()
+		EndiF	
+		RestArea(aArea)
+	Next nX	
 
-	(cAlias)->(DbSkip())
-		
-EndDo
-
-#IFDEF TOP
 	dbSelectArea(cAlias)
-	dbCloseArea()
-#ENDIF
+	aArea := GetArea()
+	If "SB1"==cAliasAnt
+		MATA010(aRotAut,4)
+	ElseIf "SA2"==cAliasAnt
+		MATA020(aRotAut,4)
+	ElseIf "SA1"==cAliasAnt
+		MATA030(aRotAut,4)
+	ElseIf "SF4"==cAliasAnt
+		MATA080(aRotAut,4)
+	ElseIf "SFM"==cAliasAnt
+		MATA089(aRotAut,4)
+	ElseIf "SE2"==cAliasAnt
+		FINA050(aRotAut,,4)
+	ElseIf "SE1"==cAliasAnt
+		FINA040(aRotAut,4)	
+	EndIf
+
+	cLinha := ""
+
+	dbSelectArea(cAlias)
+	If !Empty(cExpApFim) .AND. nX==1
+		cLinha += &(cExpApFim)
+	EndIf
+
+	If !Empty(cPosiciona)
+		cLinha += " - "+&cPosiciona
+	EndIf
+
+	If lMsErroAuto
+		cLinha += STR0060+NomeAutoLog()+STR0043 //" --> Não atualizado, verificar observação deste registro no arquivo "###" criado no diretório STARTPATH do sistema, geralmente SYSTEM ou SIGAADV."
+		cLinha += CRLF
+	ElseIf nX==1 .OR. cAliasAnt $ "SE2|SE1" 
+		cLinha += STR0044 //" --> Atualização efetuada com sucesso."
+		cLinha += CRLF
+	EndIf
+
+	//-- Tamanho limite da string = 1GB
+	If Len(cTexto) + Len(cLinha) > 1000000
+		SaveLog(cFileLog,cTexto)
+		cTexto := ''
+	EndIf
+	cTexto += cLinha
+
+	RestArea(aArea)
+	aRotAut:= {}
+
+Next nRec
 
 RestArea(aAreaSX3)
 RestArea(aAreaAnt)
+
+FwFreeArray(aRecnos)
+aRecnos := {}
+
 Return lRet
 /*
 ÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜ
@@ -781,16 +726,14 @@ Static Function ProcWiz(oWizard,oTWBrow,cAlias,cFil,oGetDad,cMarca,cCdBlock,aCam
 Local	lRet		:=	.F.
 Local	nI			:=	1
 Local	aAgrCmps	:=	{}
-Local 	aAliasFlds	:=  {}
 Local 	aAreaAnt	:=  {}
-Local	cFrom 		:=	""
-Local	cWhere		:=	""
-Local	cOrder		:=	""
-Local	cFilQry		:=	""
-Local   cSelect		:=  ''
 Local	cAliasAnt	:=	cAlias  
 Local 	nX          := 0
 
+If !Empty(aRecnos)
+	FwFreeArray(aRecnos)
+	aRecnos := {}
+Endif	
 
 aColsWiz	:=	{}
 cCampo		:=	AllTrim(oTWBrow:AARRAY[oTWBrow:nAT,2])
@@ -835,59 +778,20 @@ EndIf
 aAlterRot:= ProcGetD(aAgrCmps,aCampos)   
 
 aAreaAnt	:= (cAliasAnt)->(GetArea())
-DbSelectArea (cAlias)
-(cAlias)->(DbSetOrder (1))
-#IFDEF TOP
-
-	If (TcSrvType ()<>"AS/400")
-		aAliasFlds := (cAlias)->( DbStruct() )
-		cFrom	:=	"%"+RetSqlName(cAlias)+" "+cAlias+"%"
-		cFilQry	:=	SubStr(cAlias,2,2)+"_FILIAL"
-		cWhere	:=	"%"+cAlias+".D_E_L_E_T_=' ' AND "+cAlias+"."+cFilQry+"='"+xFilial(cAlias)+"'%"
-		cOrder	:=	"%"+SqlOrder(IndexKey())+"%"
-		cAlias	:=	GetNextAlias()
-    	BeginSql Alias cAlias
-		SELECT 
-			COUNT(R_E_C_N_O_) AS CTD
-		FROM 
-			%Exp:cFrom%
-		WHERE 
-			%Exp:cWhere%
-		EndSql
-		ProcRegua(CTD)
-		dbSelectArea(cAlias)
-		
-		(cAlias)->( dbCloseArea() )
-		
-		cSelect := GetQryFrom (cGetDB, aAliasFlds )
-		
-		BeginSql Alias cAlias
-		SELECT %Exp:cSelect%
-		FROM 
-			%Exp:cFrom%
-		WHERE 
-			%Exp:cWhere%
-		ORDER BY 
-			%Exp:cOrder%
-		EndSql
-	Else
-#ENDIF
-
-	dbSelectArea(cAlias)
-	ProcRegua(LastRec())
-	dbSeek(xFilial())
-
-#IFDEF TOP
-	EndIf
-#ENDIF	
+DbSelectArea(cAlias)
+(cAlias)->(DbSetOrder(1))
 
 cFil := StrTran(UPPER(cFil),"DTOS")
+
+//Executa o filtro na tabela
+(cAlias)->(DbSetFilter( {||&cFil}, cFil  ) )
+(cAlias)->(DBGoTop())
+
 While !Eof() .And. xFilial(cAliasAnt)==&(SubStr(cAliasAnt,2,2)+"_FILIAL") .And. !Empty(aCampos)
-	(cAliasAnt)->(DbGoto( (cAlias)->RECNO) )
 	If !Empty(cFil) .And. (cAlias)->(&(cFil))
 		lRet	:=	.T.
-		nPos := &(cCdBlock)
-		If Len(aColsWiz)==0 .Or. nPos==0
+		Aadd(aRecnos,(cAlias)->(RECNO()))
+		If Len(aColsWiz)==0 .Or. (nPos := &(cCdBlock))==0
 			aAdd(aColsWiz,{})
 			For nI := 1 To Len(aAgrCmps)
 				aAdd(aTail(aColsWiz),&(aAgrCmps[nI]))
@@ -902,23 +806,24 @@ While !Eof() .And. xFilial(cAliasAnt)==&(SubStr(cAliasAnt,2,2)+"_FILIAL") .And. 
 	EndIf
 
 	(cAlias)->(DbSkip())
-	IncProc()	
-EndDo      
+	IncProc()
+EndDo		  
 
 If Empty(aCampos) 
 	lRet	:=	.F.
 EndIf
 
-#IFDEF TOP
-	dbSelectArea(cAlias)
-	dbCloseArea()
-#ENDIF
-
 RestArea(aAreaAnt)
+
+If !Empty(cFil)
+	(cAlias)->(dbClearFilter())
+EndIf
+
 If lRet
 	aSort(aColsWiz,,,{|x,y|x[1]<y[1]})
 	oGetDad := MsNewGetDados():New(5,5,133,283,GD_UPDATE,"AllwaysTrue","AllwaysTrue",,aAlterRot,/*freeze*/,Len(aColsWiz),/*fieldok*/,/*superdel*/,/*delok*/,oWizard:oMPanel[oWizard:NPANEL+1],aHeadWiz,aColsWiz)
 EndIf
+
 Return lRet
 /*
 ÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜ
@@ -1162,26 +1067,3 @@ Static Function GetQryFrom (cGetDB, aAliasFlds )
 		cFromQuery := "%" + cFromQuery + "%"
 	EndIf
 Return cFromQuery
-
-//------------------------------------------------------------------------------
-/*/	{Protheus.doc} QryAtua
-
-Usada para limpar os caracteres vindos no cFil para ser utilizado na Query
-
-@author	Yuri Gimenes / SQUAD FISCAL
-@since	22/06/2021
-@version 12.1.27
-/*/ 
-//------------------------------------------------------------------------------
-
-Static Function StrTira(cFil)
-
-Local cFiltro := cFil
-
-cFiltro := STRTRAN(cFiltro,'"',"'")
-cFiltro := STRTRAN(cFiltro,"==","=")
-cFiltro := STRTRAN(cFiltro,".AND.","AND")
-cFiltro := STRTRAN(cFiltro,".OR.","OR")
-cFiltro := STRTRAN(cFiltro,"$","LIKE")
-
-Return cFiltro
